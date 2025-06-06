@@ -1,26 +1,37 @@
 import type { PageServerLoad } from './$types';
+import { SECRET_MQTT_URL, SECRET_MQTT_USERNAME, SECRET_MQTT_PASSWORD } from '$env/static/private';
 import mqtt from 'mqtt';
+import type { Position } from '$lib/types';
 
 const options = {
-	username: 'iidre',
-	password: 'iidre',
+	username: SECRET_MQTT_USERNAME,
+	password: SECRET_MQTT_PASSWORD,
 	reconnectPeriod: 10000
 };
 
-let messages = [];
-let client = null;
+const messages: Position[] = [];
+let client: mqtt.MqttClient | undefined = undefined;
 
-export const load: PageServerLoad = async ({ locals }) => {
-	if (!client) {
-		client = mqtt.connect('ws://vitopti.iidre.com:9001', options);
-		client.on('connect', function () {
-			console.log('Connected to Mosquitto via WebSocket');
-			client.subscribe('tag');
-		});
-		client.on('message', function (topic, message) {
-			messages.push(JSON.parse(message.toString()));
-		});
+const initMQTT = () => {
+	if (client) {
+		return;
 	}
+	client = mqtt.connect(SECRET_MQTT_URL, options);
+
+	client.on('connect', function () {
+		if (!client) {
+			throw new Error('MQTT client not initialized');
+		}
+		client.subscribe('tag');
+	});
+
+	client.on('message', function (topic, message) {
+		messages.push(JSON.parse(message.toString()));
+	});
+
+};
+export const load: PageServerLoad = async ({ locals }) => {
+	initMQTT();
 	return {
 		messages: messages
 	};
